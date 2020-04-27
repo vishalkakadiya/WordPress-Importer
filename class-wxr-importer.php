@@ -1523,8 +1523,10 @@ class WXR_Importer extends WP_Importer {
 			$login = $this->user_slug_override[ $login ];
 		}
 
+		$user_login = sanitize_user( $login, true );
+
 		$userdata = array(
-			'user_login'   => sanitize_user( $login, true ),
+			'user_login'   => $user_login,
 			'user_pass'    => wp_generate_password(),
 		);
 
@@ -1542,22 +1544,27 @@ class WXR_Importer extends WP_Importer {
 			$userdata[ $key ] = $data[ $key ];
 		}
 
-		$user_id = wp_insert_user( wp_slash( $userdata ) );
-		if ( is_wp_error( $user_id ) ) {
-			$this->logger->error( sprintf(
-				__( 'Failed to import user "%s"', 'wordpress-importer' ),
-				$userdata['user_login']
-			) );
-			$this->logger->debug( $user_id->get_error_message() );
+		$user_id = username_exists( $user_login );
 
-			/**
-			 * User processing failed.
-			 *
-			 * @param WP_Error $user_id Error object.
-			 * @param array $userdata Raw data imported for the user.
-			 */
-			do_action( 'wxr_importer.process_failed.user', $user_id, $userdata );
-			return false;
+		if ( ! $user_id ) {
+
+			$user_id = wp_insert_user( wp_slash( $userdata ) );
+
+			if ( is_wp_error( $user_id ) ) {
+
+				$this->logger->error( sprintf( __( 'Failed to import user "%s"', 'wordpress-importer' ), $userdata['user_login'] ) );
+				$this->logger->debug( $user_id->get_error_message() );
+
+				/**
+				 * User processing failed.
+				 *
+				 * @param WP_Error $user_id  Error object.
+				 * @param array    $userdata Raw data imported for the user.
+				 */
+				do_action( 'wxr_importer.process_failed.user', $user_id, $userdata );
+
+				return false;
+			}
 		}
 
 		if ( $original_id ) {
@@ -1631,10 +1638,11 @@ class WXR_Importer extends WP_Importer {
 
 				// Export gets meta straight from the DB so could have a serialized string.
 				if ( ! $value ) {
+
 					$value = maybe_unserialize( $meta_item['value'] );
 				}
 
-				update_user_meta( $user_id, wp_slash( $key ), wp_slash( $value ) );
+				update_user_meta( $user_id, wp_slash( $key ), wp_slash_strings_only( $value ) );
 				do_action( 'import_user_meta', $user_id, $key, $value );
 			}
 		}

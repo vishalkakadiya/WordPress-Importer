@@ -1565,6 +1565,11 @@ class WXR_Importer extends WP_Importer {
 
 				return false;
 			}
+		} else {
+
+			$userdata['ID'] = $user_id;
+
+			wp_update_user( $userdata );
 		}
 
 		if ( $original_id ) {
